@@ -26,9 +26,14 @@ async function scan() {
       log("<ERROR> Cannot read data from the NFC tag. Try another one?");
     });
 
-    ndef.addEventListener("reading", ({ message, serialNumber }: any) => {
-      log(`<INFO> Serial Number: ${serialNumber}`);
-      log(`<INFO> Records: (${message.records.length})`);
+    // ndef.addEventListener("reading", ({ message, serialNumber }: any) => {
+    //   log(`<INFO> Serial Number: ${serialNumber}`);
+    //   log(`<INFO> Records: (${message.records.length})`);
+    // });
+
+    ndef.addEventListener("reading", (reading: any) => {
+      log(`<INFO> Reading: ${reading}`);
+      console.log(reading)
     });
   } catch (error) {
     log("<ERROR>" + error);
