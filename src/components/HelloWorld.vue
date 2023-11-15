@@ -15,29 +15,41 @@ function log(message: string) {
 }
 
 async function scan() {
-  log("User clicked scan button");
+  log("<INFO>User clicked scan button");
 
   try {
     const ndef = new window.NDEFReader();
     await ndef.scan();
-    log("> Scan started");
+    log("<INFO> Scan started");
 
     ndef.addEventListener("readingerror", () => {
-      log("Argh! Cannot read data from the NFC tag. Try another one?");
+      log("<ERROR> Cannot read data from the NFC tag. Try another one?");
     });
 
     ndef.addEventListener("reading", ({ message, serialNumber }: any) => {
-      log(`> Serial Number: ${serialNumber}`);
-      log(`> Records: (${message.records.length})`);
+      log(`<INFO> Serial Number: ${serialNumber}`);
+      log(`<INFO> Records: (${message.records.length})`);
     });
   } catch (error) {
-    log("Argh! " + error);
+    log("<ERROR>" + error);
+  }
+}
+
+async function write() {
+  log("<INFOR> User clicked write button");
+
+  try {
+    const ndef = new window.NDEFReader();
+    await ndef.write("Hello world!");
+    log("<INFO> Message written");
+  } catch (error) {
+    log("<ERROR> " + error);
   }
 }
 
 const computedLogs = computed(() => {
   return !("NDEFReader" in window)
-    ? "Web NFC is not available. Use Chrome on Android."
+    ? "<ERROR> Web NFC is not available. Use Chrome on Android."
     : logBox.value;
 });
 </script>
@@ -47,14 +59,13 @@ const computedLogs = computed(() => {
 
   <div class="card">
     <button type="button" @click="scan">Scan</button>
-    <!-- <button type="button" @click="write">Write</button>
-    <button type="button" @click="makeReadOnly">Make Read-Only</button> -->
+    <button type="button" @click="write">Write</button>
   </div>
 
   <div>
-    <textarea name="logs" id="logs" cols="30" rows="10">
+    <pre name="logs" id="logs" cols="30" rows="10">
       {{ computedLogs }}
-    </textarea>
+    </pre>
   </div>
 </template>
 
