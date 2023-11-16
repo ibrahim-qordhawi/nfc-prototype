@@ -10,7 +10,10 @@
     "generate-pwa-assets": "pwa-assets-generator"
   },
   "dependencies": {
-    "vue": "^3.3.4"
+    "@simplewebauthn/browser": "^8.3.4",
+    "@simplewebauthn/typescript-types": "^8.3.4",
+    "vue": "^3.3.4",
+    "workbox-precaching": "^7.0.0"
   },
   "devDependencies": {
     "@vite-pwa/assets-generator": "^0.0.10",
