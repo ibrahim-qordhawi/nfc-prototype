@@ -12,6 +12,11 @@ function authenticateLog(message: string) {
   authenticateLogBox.value += message + "\n";
 }
 
+
+function stopSubmit(event: any) {
+  event.preventDefault();
+}
+
 onMounted(() => {
   fetch(`${authServerUrl}/generate-authentication-options`)
     .then((resp) => resp.json())
@@ -156,6 +161,26 @@ async function authenticate() {
       </pre>
     </div>
   </div>
+
+  <form @submit="stopSubmit">
+    <section id="inputUsername">
+      <label for="username">Username</label>
+      <input
+        type="text"
+        name="username"
+        autocomplete="username webauthn"
+        autofocus
+      />
+      <br />
+      <label for="password">Password</label>
+      <input
+        type="password"
+        name="password"
+        autocomplete="current-password webauthn"
+      />
+      <br />
+    </section>
+  </form>
 
   <div>
     <button type="button" @click="authenticate">Authenticate</button>
