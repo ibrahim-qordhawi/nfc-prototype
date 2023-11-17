@@ -1,193 +1,120 @@
 <script setup lang="ts">
-import {
-  startAuthentication,
-  startRegistration,
-} from "@simplewebauthn/browser";
-import { onMounted, ref } from "vue";
+import { client, parsers } from "@passwordless-id/webauthn";
+import { ref } from "vue";
 
-const authServerUrl = "http://localhost:8000";
+const username = ref<any>(null);
+const isRegistered = ref(false);
+const isAuthenticated = ref(false);
+const isRoaming = ref(false);
+const registrationData = ref<any>(null);
+const authenticationData = ref<any>(null);
 
-const authenticateLogBox = ref("");
-function authenticateLog(message: string) {
-  authenticateLogBox.value += message + "\n";
-}
-
-
-function stopSubmit(event: any) {
-  event.preventDefault();
-}
-
-onMounted(() => {
-  fetch(`${authServerUrl}/generate-authentication-options`)
-    .then((resp) => resp.json())
-    .then((opts) => {
-      console.log("Authentication Options (Autofill)", opts);
-      startAuthentication(opts, true)
-        .then(async (asseResp) => {
-          // We can assume the DOM has loaded by now because it had to for the user to be able
-          // to interact with an input to choose a credential from the autofill
-          authenticateLog("Authentication Response (Autofill)");
-          authenticateLog(JSON.stringify(asseResp, null, 2));
-
-          const verificationResp = await fetch(
-            `${authServerUrl}/verify-authentication`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(asseResp),
-            }
-          );
-
-          const verificationJSON = await verificationResp.json();
-
-          authenticateLog("Server Response (Autofill)");
-          authenticateLog(JSON.stringify(verificationJSON, null, 2));
-
-          if (verificationJSON && verificationJSON.verified) {
-            authenticateLog("User Authenticated!");
-          } else {
-            authenticateLog("Oh no, something went wrong! Response:");
-            authenticateLog(JSON.stringify(verificationJSON));
-          }
-        })
-        .catch((err) => {
-          console.error("(Autofill)", err);
-        });
-    });
-});
-
-const registerLogBox = ref("");
-function registerLog(message: string) {
-  registerLogBox.value += message + "\n";
-}
-
-async function register() {
-  const resp = await fetch(`${authServerUrl}/generate-registration-options`);
-
-  let attResp;
-  try {
-    const opts = await resp.json();
-
-    registerLog("Registration Options");
-    registerLog(JSON.stringify(opts, null, 2));
-    attResp = await startRegistration(opts);
-    registerLog("Registration Response");
-    registerLog(JSON.stringify(attResp, null, 2));
-  } catch (error: any) {
-    if (error.name === "InvalidStateError") {
-      registerLog(
-        "Error: Authenticator was probably already registered by user"
-      );
-    } else {
-      registerLog(error);
-    }
-
-    throw error;
-  }
-
-  const verificationResp = await fetch(`${authServerUrl}/verify-registration`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(attResp),
-  });
-
-  const verificationJSON = await verificationResp.json();
-  registerLog("Server Response");
-  registerLog(JSON.stringify(verificationJSON, null, 2));
-
-  if (verificationJSON && verificationJSON.verified) {
-    registerLog("Authenticator registered!");
-  } else {
-    registerLog("Oh no, something went wrong! Response:");
-    registerLog(`${JSON.stringify(verificationJSON)}`);
-  }
-}
-
-async function authenticate() {
-  const resp = await fetch(`${authServerUrl}/generate-authentication-options`);
-
-  let asseResp;
-  try {
-    const opts = await resp.json();
-
-    authenticateLog("Authentication Options");
-    authenticateLog(JSON.stringify(opts, null, 2));
-    asseResp = await startAuthentication(opts);
-    authenticateLog("Authentication Response");
-    authenticateLog(JSON.stringify(asseResp, null, 2));
-  } catch (error: any) {
-    authenticateLog(error);
-
-    throw error;
-  }
-
-  const verificationResp = await fetch(
-    `${authServerUrl}/verify-authentication`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(asseResp),
-    }
+async function checkIsRegistered() {
+  console.log(
+    username.value + " => " + !!window.localStorage.getItem(username.value)
   );
+  isRegistered.value = !!window.localStorage.getItem(username.value);
+}
+async function register() {
+  let res = await client.register(username.value, window.crypto.randomUUID(), {
+    // authType: this.isRoaming ? "roaming" : "auto",
+    authenticatorType: isRoaming.value ? "roaming" : "auto",
+  });
+  console.debug(res);
 
-  const verificationJSON = await verificationResp.json();
-  authenticateLog("Server Response");
-  authenticateLog(JSON.stringify(verificationJSON, null, 2));
+  const parsed = parsers.parseRegistration(res);
+  console.log(parsed);
 
-  if (verificationJSON && verificationJSON.verified) {
-    authenticateLog("User authenticated");
-  } else {
-    authenticateLog("Oh no, something went wrong! Response:");
-    authenticateLog(`${JSON.stringify(verificationJSON)}`);
-  }
+  window.localStorage.setItem(username.value, parsed.credential.id);
+  isAuthenticated.value = true;
+  registrationData.value = parsed;
+
+  // this.$buefy.toast.open({
+  //   message: "Registered!",
+  //   type: "is-success",
+  // });
+  console.log("Registered");
+
+  await checkIsRegistered();
+}
+async function login() {
+  let credentialId = window.localStorage.getItem(username.value);
+  let res = await client.authenticate(
+    credentialId ? [credentialId] : [],
+    window.crypto.randomUUID(),
+    { authenticatorType: isRoaming.value ? "roaming" : "auto" }
+  );
+  console.debug(res);
+
+  const parsed = parsers.parseAuthentication(res);
+  console.log(parsed);
+
+  isAuthenticated.value = true;
+  authenticationData.value = parsed;
+
+  // this.$buefy.toast.open({
+  //   message: "Signed in!",
+  //   type: "is-success",
+  // });
+
+  console.log("Signed in!");
+}
+async function logout() {
+  isAuthenticated.value = false;
+  // this.$buefy.toast.open({
+  //   message: "Signed out!",
+  //   type: "is-success",
+  // });
+  console.log("Signed out!");
+  authenticationData.value = null;
+  registrationData.value = null;
 }
 </script>
 
 <template>
-  <h2>Web Authn</h2>
-
-  <div class="card">
-    <button type="button" @click="register">Register</button>
-
+  <template v-if="!isAuthenticated">
+    <!-- <b-field> -->
+    <input
+      v-model="username"
+      placeholder="Username"
+      @input="checkIsRegistered()"
+      autocomplete="webauthn username"
+      type="text"
+    />
+    <!-- </b-field> -->
+    <!-- <b-field> -->
+    <input type="checkbox" v-model="isRoaming" />
+    <p>Use roaming authenticator (phone, usb key...)</p>
+    <!-- </b-field> -->
     <div>
-      <pre name="registerLogs" id="registerLogs" cols="30" rows="10">
-        {{ registerLogBox }}
-      </pre>
+      <button @click="register()" :disabled="!username">Register device</button>
+      <button @click="login()" :disabled="!isRegistered">Authenticate</button>
     </div>
-  </div>
-
-  <form @submit="stopSubmit">
-    <section id="inputUsername">
-      <label for="username">Username</label>
-      <input
-        type="text"
-        name="username"
-        autocomplete="username webauthn"
-        autofocus
-      />
-      <br />
-      <label for="password">Password</label>
-      <input
-        type="password"
-        name="password"
-        autocomplete="current-password webauthn"
-      />
-      <br />
+  </template>
+  <template v-if="isAuthenticated">
+    <p>{{ "Hello " + username + "!" }}</p>
+    <section
+      v-if="registrationData && !authenticationData"
+      style="text-align: left"
+    >
+      <p><b>Credential ID:</b> {{ registrationData.credential.id }}</p>
+      <p>
+        <b>Public Key:</b>
+        {{ registrationData.credential.publicKey.substring(0, 32) }}...
+      </p>
+      <p><b>Algorithm:</b> {{ registrationData.credential.algorithm }}</p>
+      <p>
+        <b>Authenticator Name:</b> {{ registrationData.authenticator.name }}
+      </p>
     </section>
-  </form>
-
-  <div>
-    <button type="button" @click="authenticate">Authenticate</button>
+    <section v-if="authenticationData" style="text-align: left">
+      <p><b>Credential ID:</b> {{ authenticationData.credentialId }}</p>
+      <p>
+        <b>Signature:</b> {{ authenticationData.signature.substring(0, 32) }}...
+      </p>
+    </section>
     <div>
-      <pre name="authenticateLogs" id="authenticateLogs" cols="30" rows="10">
-        {{ authenticateLogBox }}
-      </pre>
+      <button @click="logout()">Sign Out</button>
     </div>
-  </div>
+  </template>
 </template>
