@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import WebAuth from "./WebAuth.vue";
 declare global {
   interface Window {
     NDEFReader: any;
@@ -72,6 +73,8 @@ const computedLogs = computed(() => {
       {{ computedLogs }}
     </pre>
   </div>
+  
+  <WebAuth />
 </template>
 
 <style scoped>
